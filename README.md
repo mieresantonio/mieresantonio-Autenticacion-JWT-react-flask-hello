@@ -1,81 +1,91 @@
-# WebApp boilerplate with React JS and Flask API
+# Autenticación JWT con React + Flask
 
-Build web applications using React.js for the front end and python/flask for your backend API.
+Aplicación full-stack con registro, inicio de sesión y una zona privada protegida por token JWT. El frontend en React consume una API en Flask: el usuario se registra, inicia sesión, recibe un token y solo con ese token puede entrar a la página privada.
 
-- Documentation can be found here: https://4geeks.com/docs/start/react-flask-template
-- Here is a video on [how to use this template](https://www.loom.com/share/f37c6838b3f1496c95111e515e83dd9b)
-- Integrated with Pipenv for package managing.
-- Fast deployment to Render [in just a few steps here](https://4geeks.com/docs/start/deploy-to-render-com).
-- Use of .env file.
-- SQLAlchemy integration for database abstraction.
+Ejercicio del bootcamp Full Stack de 4Geeks Academy, completado en septiembre de 2026. La autenticación JWT que se practica aquí es la misma competencia que usa el proyecto final [Block Ethos](https://github.com/mieresantonio/block-ethos).
 
-### 1) Installation:
+## Qué hace
 
-> If you use Github Codespaces (recommended) or Gitpod this template will already come with Python, Node and the Posgres Database installed. If you are working locally make sure to install Python 3.10, Node 
+- **Registro** (`/signup`): crea un usuario con correo y contraseña. Rechaza correos ya registrados y peticiones sin JSON.
+- **Inicio de sesión** (`/login`): valida las credenciales y devuelve un token de acceso JWT, que el frontend guarda en `sessionStorage`.
+- **Zona privada** (`/private`): solo accesible con un token válido. Sin token, con token inválido o expirado, redirige al login.
+- **Contraseñas con hash**: nunca se guardan en texto plano; se usa `werkzeug.security` (`generate_password_hash` / `check_password_hash`) y el serializador del usuario excluye la contraseña.
 
-It is recomended to install the backend first, make sure you have Python 3.10, Pipenv and a database engine (Posgress recomended)
+## Endpoints de la API
 
-1. Install the python packages: `$ pipenv install`
-2. Create a .env file based on the .env.example: `$ cp .env.example .env`
-3. Install your database engine and create your database, depending on your database you have to create a DATABASE_URL variable with one of the possible values, make sure you replace the valudes with your database information:
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/signup` | Registra un usuario (`email`, `password`). Devuelve 201 o 400 si el correo ya existe. |
+| `POST` | `/api/token` | Inicia sesión y devuelve `{ token, user }`. Devuelve 401 si las credenciales son incorrectas. |
+| `GET` | `/api/private` | Ruta protegida con `@jwt_required()`. Requiere `Authorization: Bearer <token>`. |
+| `GET`/`POST` | `/api/hello` | Endpoint de ejemplo de la plantilla. |
 
-| Engine    | DATABASE_URL                                        |
-| --------- | --------------------------------------------------- |
-| SQLite    | sqlite:////test.db                                  |
-| MySQL     | mysql://username:password@localhost:port/example    |
-| Postgress | postgres://username:password@localhost:5432/example |
+## Stack
 
-4. Migrate the migrations: `$ pipenv run migrate` (skip if you have not made changes to the models on the `./src/api/models.py`)
-5. Run the migrations: `$ pipenv run upgrade`
-6. Run the application: `$ pipenv run start`
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | React 18.2, React Router 6, Vite 4, Bootstrap |
+| Backend | Python 3.13, Flask, Flask-SQLAlchemy, Flask-JWT-Extended 4.6.0, Flask-Migrate, Flask-CORS |
+| Base de datos | SQLite por defecto (sin `DATABASE_URL` usa `/tmp/test.db`); Postgres con `DATABASE_URL` |
+| Herramientas | Pipenv (backend), npm (frontend), Node ≥ 20 |
 
-> Note: Codespaces users can connect to psql by typing: `psql -h localhost -U gitpod example`
+## Cómo correrlo
 
-### Undo a migration
+### 1. Backend (puerto 3001)
 
-You are also able to undo a migration by running
-
-```sh
-$ pipenv run downgrade
+```bash
+pipenv install
+cp .env.example .env
+pipenv run migrate   # solo si cambiaste los modelos en src/api/models.py
+pipenv run upgrade
+pipenv run start
 ```
 
-### Backend Populate Table Users
+La API queda en `http://localhost:3001`, con el sitemap de endpoints en `/`.
 
-To insert test users in the database execute the following command:
+### 2. Frontend
 
-```sh
-$ flask insert-test-users 5
+```bash
+npm install
+npm run start
 ```
 
-And you will see the following message:
+> ⚠️ Antes de arrancar el frontend, revisa la variable `VITE_BACKEND_URL` en tu `.env`: el valor de ejemplo apunta a una URL de Codespaces que ya no existe. En local debe ser `http://localhost:3001`.
 
-```
-  Creating test users
-  test_user1@test.com created.
-  test_user2@test.com created.
-  test_user3@test.com created.
-  test_user4@test.com created.
-  test_user5@test.com created.
-  Users created successfully!
+### Usuarios de prueba
+
+```bash
+flask insert-test-users 5
 ```
 
-### **Important note for the database and the data inside it**
+Crea usuarios `test_user1@test.com` … `test_user5@test.com`.
 
-Every Github codespace environment will have **its own database**, so if you're working with more people eveyone will have a different database and different records inside it. This data **will be lost**, so don't spend too much time manually creating records for testing, instead, you can automate adding records to your database by editing ```commands.py``` file inside ```/src/api``` folder. Edit line 32 function ```insert_test_data``` to insert the data according to your model (use the function ```insert_test_users``` above as an example). Then, all you need to do is run ```pipenv run insert-test-data```.
+## Estructura
 
-### Front-End Manual Installation:
+```
+src/
+├── api/
+│   ├── routes.py     # Endpoints /signup, /token, /private, /hello
+│   ├── models.py     # Modelo User con hash de contraseña
+│   ├── app.py        # Configuración de Flask + JWT + CORS
+│   └── commands.py   # Comando CLI insert-test-users
+└── front/
+    ├── pages/
+    │   ├── Signup.jsx  # Formulario de registro
+    │   ├── Login.jsx   # Formulario de login, guarda el token
+    │   └── Private.jsx # Valida el token contra /api/private
+    ├── routes.jsx      # Rutas /, /signup, /login, /private
+    └── store.js        # Store de la plantilla
+```
 
--   Make sure you are using node version 20 and that you have already successfully installed and runned the backend.
+## Qué demuestra
 
-1. Install the packages: `$ npm install`
-2. Start coding! start the webpack dev server `$ npm run start`
+- Autenticación completa con JWT: emisión del token en el login, envío como `Bearer` y validación en rutas protegidas.
+- Hash de contraseñas y serialización segura del usuario.
+- Manejo de errores con códigos HTTP correctos (400, 401, 404) y mensajes en español en el frontend.
+- Separación frontend/backend con variables de entorno y CORS.
 
-## Publish your website!
+## Notas
 
-This boilerplate it's 100% read to deploy with Render.com and Heroku in a matter of minutes. Please read the [official documentation about it](https://4geeks.com/docs/start/deploy-to-render-com).
-
-### Contributors
-
-This template was built as part of the 4Geeks Academy [Coding Bootcamp](https://4geeksacademy.com/us/coding-bootcamp) by [Alejandro Sanchez](https://twitter.com/alesanchezr) and many other contributors. Find out more about our [Full Stack Developer Course](https://4geeksacademy.com/us/coding-bootcamps/part-time-full-stack-developer), and [Data Science Bootcamp](https://4geeksacademy.com/us/coding-bootcamps/datascience-machine-learning).
-
-You can find other templates and resources like this at the [school github page](https://github.com/4geeksacademy/).
+- Las dependencias del backend se instalan con **Pipenv** (`Pipfile`); el `requirements.txt` del repo es de una versión anterior de la plantilla y está desactualizado.
+- Construido sobre la plantilla `react-flask-hello` de 4Geeks Academy. El trabajo propio es la autenticación completa (backend + las tres páginas) en un solo commit, el 24 de septiembre de 2026.
